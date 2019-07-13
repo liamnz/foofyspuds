@@ -1,7 +1,7 @@
 #' Get a Dataset Ready For Modelling
 #'
-#'
 #' @import recipes
+#' @importFrom rsample initial_split training testing
 #'
 #' @export
 prepare_data <- function(data, response, target, verbose = TRUE){
@@ -19,7 +19,7 @@ prepare_data <- function(data, response, target, verbose = TRUE){
   # is what `yardstick` expects for its calculations.
   input[, response] <- forcats::fct_relevel(input[[response]], target, after = Inf)
 
-  data <- rsample::initial_split(data, strata = {{response}})
+  data <- initial_split(data, strata = {{response}})
 
   rec <- recipe(head(training(data), 5)) %>%
     update_role(-{{response}}, new_role = "predictor") %>%
@@ -30,9 +30,9 @@ prepare_data <- function(data, response, target, verbose = TRUE){
     step_medianimpute(all_numeric()) %>%
     step_other(all_nominal(), -{{response}}, other = "(Pooled)")
 
-  steps <- prep(rec, rsample::training(data), retain = FALSE)
-  train <- bake(steps, rsample::training(data))
-  test  <- bake(steps, rsample::testing(data))
+  steps <- prep(rec, training(data), retain = FALSE)
+  train <- bake(steps, training(data))
+  test  <- bake(steps, testing(data))
 
   if (verbose){
     cat("Pre-processing complete, duration: ", proc.time()[3] - start_time, "s\n\n", sep = "")
