@@ -6,18 +6,18 @@
 #' @export
 prepare_data <- function(data, response, target, verbose = TRUE){
 
-  if (nrow(dplyr::distinct(tidyr::drop_na(input[, response]))) != 2){
-    stop("Response variable must have exactly two levels")
+  # Ensure response is a factor with the target class in the first position.
+  # This is what `yardstick` expects for its calculations.
+  data[, response] <- forcats::fct_relevel(data[[response]], target)
+
+  if (nlevels(data[[response]] != 2)){
+    stop("Response variable must exactly two levels")
   }
 
   if (verbose){
     start_time <- proc.time()[3]
-    cat("Pre-processing data, please wait...\n", sep = "")
+    cat("Pre-processing training data, please wait...\n\n", sep = "")
   }
-
-  # Ensure response is a factor with the target class in the last position. This
-  # is what `yardstick` expects for its calculations.
-  input[, response] <- forcats::fct_relevel(input[[response]], target, after = Inf)
 
   data <- initial_split(data, strata = {{response}})
 
@@ -28,16 +28,24 @@ prepare_data <- function(data, response, target, verbose = TRUE){
     step_nzv(all_predictors()) %>%
     step_modeimpute(all_nominal(), -{{response}}) %>%
     step_medianimpute(all_numeric()) %>%
-    step_other(all_nominal(), -{{response}}, other = "(Pooled)")
-
-  steps <- prep(rec, training(data), retain = FALSE)
-  train <- bake(steps, training(data))
-  test  <- bake(steps, testing(data))
+    step_other(all_nominal(), -{{response}}, other = "minor categories") %>%
+    prep(training(data), verbose = verbose)
 
   if (verbose){
-    cat("Pre-processing complete, duration: ", proc.time()[3] - start_time, "s\n\n", sep = "")
-    print(steps)
+    cat("Training data processed, duration: ", proc.time()[3] - start_time, "s\n\n", sep = "")
+    print(rec)
   }
 
-  list(recipe = steps, train  = train, test = test)
+  if (verbose){
+    start_time <- proc.time()[3]
+    cat("\nApplying pre-processing to test data, please wait...\n", sep = "")
+  }
+
+  test <- bake(rec, testing(data))
+
+  if (verbose){
+    cat("Test data processed, duration: ", proc.time()[3] - start_time, "s\n\n", sep = "")
+  }
+
+  list(recipe = rec, test_data = test)
 }
